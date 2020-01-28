@@ -186,7 +186,8 @@ export class SQXToken
     }
 
     public findExpressionRange():{expression_start:number,expression_end:number} {
-        let start = this.token_start, end = Math.max( this.token_end, this.children_end );
+        let start = this.token_start;
+        let end = Math.max( this.token_end, this.children_end );
         let callback = ( token:SQXToken ) => {
             start = Math.min( start, token.token_start );
             end = Math.max( end, token.token_end, token.children_end );
@@ -345,29 +346,6 @@ export class SQXScalarValue extends SQXToken
         return scalar;
     }
 
-    public toQueryString():string {
-        if ( this.type === "null" ) {
-            return "null";
-        } else if ( this.type === "boolean" ) {
-            return this.value ? "true" : "false";
-        } else if ( this.type === "number" ) {
-            return this.value.toString();
-        } else {
-            let substitution = SQXQueryState.getNamedValueById( this.value.toString() );
-            if ( substitution ) {
-                return '"' + substitution.name.toString().replace( /"/g, '\"' ) + '"';
-            }
-        }
-        if (this.type === "string") {
-            const blobValue = this.value.toString();
-            // Allows to check if value contains characters that lead to a complex query.
-            if (blobValue.indexOf("'") >= 0 || blobValue.indexOf('"') >= 0 || blobValue.indexOf('`') >= 0) {
-                return '<<<' + blobValue + '>>>';
-            }
-        }
-        return '"' + this.value.toString().replace( /"/g, '\"' ) + '"';
-    }
-
     public static fromJson( raw:any ) {
         let scalar = new SQXScalarValue();
         scalar.value = raw;
@@ -389,6 +367,29 @@ export class SQXScalarValue extends SQXToken
             scalar.textValue = raw.toString();
         }
         return scalar;
+    }
+
+    public toQueryString():string {
+        if ( this.type === "null" ) {
+            return "null";
+        } else if ( this.type === "boolean" ) {
+            return this.value ? "true" : "false";
+        } else if ( this.type === "number" ) {
+            return this.value.toString();
+        } else {
+            let substitution = SQXQueryState.getNamedValueById( this.value.toString() );
+            if ( substitution ) {
+                return '"' + substitution.name.toString().replace( /"/g, '\"' ) + '"';
+            }
+        }
+        if (this.type === "string") {
+            const blobValue = this.value.toString();
+            // Allows to check if value contains characters that lead to a complex query.
+            if (blobValue.indexOf("'") >= 0 || blobValue.indexOf('"') >= 0 || blobValue.indexOf('`') >= 0) {
+                return '<<<' + blobValue + '>>>';
+            }
+        }
+        return '"' + this.value.toString().replace( /"/g, '\"' ) + '"';
     }
 
     public toJson():any {
@@ -468,6 +469,20 @@ export class SQXPropertyRef extends SQXToken
         return instance;
     }
 
+    public static sourceJson( id:string, ns:string = null ) {
+        if ( ns && ns.length ) {
+            return {
+                source: {
+                    ns: ns,
+                    id: id
+                }
+            };
+        }
+        return {
+            source: id
+        };
+    }
+
     public toQueryString():string {
         let key = this.ns ? `${this.ns}:${this.property}` : this.property;
         let entity = SQXQueryState.getNamedProperty( key );
@@ -492,20 +507,6 @@ export class SQXPropertyRef extends SQXToken
             }
             return SQXPropertyRef.sourceJson( this.property );
         }
-    }
-
-    public static sourceJson( id:string, ns:string = null ) {
-        if ( ns && ns.length ) {
-            return {
-                source: {
-                    ns: ns,
-                    id: id
-                }
-            };
-        }
-        return {
-            source: id
-        };
     }
 }
 
@@ -592,27 +593,6 @@ export class SQXQueryState
         this.reflector = reflector;
     }
 
-    public addError( error:SQXParseError ) {
-        this.errors.push( error );
-    }
-
-    public reflect( token:SQXToken ) {
-        this.reflector( token );
-    }
-
-    public setOutput( outputId:string, token:SQXToken ) {
-        this.outputs[outputId] = token;
-    }
-
-    public getOutput( outputId:string):SQXToken {
-        return this.outputs.hasOwnProperty( outputId ) ? this.outputs[outputId] : null;
-    }
-
-    public reset() {
-        this.outputs = {};
-        this.errors = [];
-    }
-
     public static removeQuotes( item: SQXNamedEntity ){
         //  Ghettoest way ever to remove quotes from a string...  but it works!
         if ( item.name[0] === '"' ) {
@@ -657,6 +637,27 @@ export class SQXQueryState
     public static dump() {
         console.log("Entities: ", SQXQueryState.propertyByNameMap );
         console.log("Values: ", SQXQueryState.valueByNameMap );
+    }
+
+    public addError( error:SQXParseError ) {
+        this.errors.push( error );
+    }
+
+    public reflect( token:SQXToken ) {
+        this.reflector( token );
+    }
+
+    public setOutput( outputId:string, token:SQXToken ) {
+        this.outputs[outputId] = token;
+    }
+
+    public getOutput( outputId:string):SQXToken {
+        return this.outputs.hasOwnProperty( outputId ) ? this.outputs[outputId] : null;
+    }
+
+    public reset() {
+        this.outputs = {};
+        this.errors = [];
     }
 }
 
