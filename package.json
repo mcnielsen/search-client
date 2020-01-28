@@ -35,7 +35,7 @@
     "build-dev": "npm run clean &&  tsc && webpack --mode=development",
     "build": "webpack",
     "prebuild": "npm run clean && npm run lint && tsc",
-    "lint": "tslint -p tsconfig.json -c node_modules/@al/common/dist/config/tslint.json",
+    "lint": "tslint -p tsconfig.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build",
     "interactive": "node -i -e \"const SearchClient = require('./dist/commonjs/index.js').SearchClient;\""

@@ -66,7 +66,7 @@ export class SQXCursorDetails
         info.phraseRange    =   [ cursorIndex, cursorIndex ];     //  empty range at position of cursor
         if ( ! token ) {
             return new SQXCursorDetails();
-        } 
+        }
         info.tokens         =   token.siblings;
         info.tokenIndex     =   token.index;
 
@@ -177,7 +177,7 @@ export class SQXCursorDetails
         }
         return this;
     }
-    
+
     //  Set values
     public setValues( ...valueTokens:SQXToken[] ) {
         this.values = [];
@@ -196,7 +196,7 @@ export class SQXCursorDetails
                 this.values = this.values.concat( valueToken.values );
             } else if ( valueToken instanceof SQXComparatorBetween && valueToken.value1 && valueToken.value2 ) {
                 this.values.push( valueToken.value1, valueToken.value2 );
-            } 
+            }
         } );
         return this;
     }
@@ -216,7 +216,7 @@ export class SQXCursorDetails
      * This method supports execution of macros and shortcuts against specific keystrokes.
      *
      * @param {object} event The browser's keyup event
-     * @returns {boolean} True if the keystroke was acted on, false otherwise.  If true, the cursor's `expression` property 
+     * @returns {boolean} True if the keystroke was acted on, false otherwise.  If true, the cursor's `expression` property
      */
     public onKeyboardEvent(event:any):boolean {
         return false;

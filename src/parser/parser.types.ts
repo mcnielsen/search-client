@@ -32,6 +32,26 @@ export class SQXRootParseCursor implements SQXParseCursor
         this.state          =   state;
     }
 
+    //  Internal method: tests to see if the current draw cycle should cease.
+    public static shouldStop( token:SQXToken, digestedCount:number, conjunction:any, until:{(token:SQXToken):boolean} = null ):boolean {
+        if ( ! token ) {
+            return true;
+        }
+        if ( until ) {
+            if ( until( token ) ) {
+                return true;
+            }
+        }
+        if ( ! conjunction && digestedCount ) {
+            //  No conjunction, at least one item digested
+            return true;
+        }
+        if ( digestedCount && token.isTopClause() ) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Gets a token relative to the currently active index, defaulting to 0
      */
@@ -81,26 +101,6 @@ export class SQXRootParseCursor implements SQXParseCursor
         return this;
     }
 
-    //  Internal method: tests to see if the current draw cycle should cease.
-    public static shouldStop( token:SQXToken, digestedCount:number, conjunction:any, until:{(token:SQXToken):boolean} = null ):boolean {
-        if ( ! token ) {
-            return true;
-        }
-        if ( until ) {
-            if ( until( token ) ) {
-                return true;
-            }
-        }
-        if ( ! conjunction && digestedCount ) {
-            //  No conjunction, at least one item digested
-            return true;
-        }
-        if ( digestedCount && token.isTopClause() ) {
-            return true;
-        }
-        return false;
-    }
-
     public evaluateChildren( child:SQXToken, inContext:SQXOperatorBase = null ):SQXToken {
         let cursor = new SQXRootParseCursor( this.expression, child.children, this.state, this.hooks );
         let result = cursor.drawGroup( SQXTokenCollection, inContext );
@@ -145,10 +145,12 @@ export class SQXRootParseCursor implements SQXParseCursor
         }
         //  Retain this log for debugging purposes
         //  console.log("    - drawn sequence: [" + elementSequence.map( t => t.textValue ).join("/") + "] (@%s)", this.currentIndex );
-        let nominee = null, safety = elementSequence.length;
+        let nominee = null;
+        let safety = elementSequence.length;
         for ( let i = 0; i < elementSequence.length && safety >= 0; i++, safety-- ) {
             let candidate = elementSequence[i];
-            let parameters = [], parameters_end = Math.max( candidate.token_end, candidate.children_end + 1 );      //  children_end + 1 to include closing parenthesis
+            let parameters = [];
+            let parameters_end = Math.max( candidate.token_end, candidate.children_end + 1 );      //  children_end + 1 to include closing parenthesis
             if ( candidate.children.length ) {
                 let childClause = this.evaluateChildren( candidate, inContext );
                 if ( childClause instanceof SQXTokenCollection ) {
@@ -288,7 +290,7 @@ export class SQXRootParseCursor implements SQXParseCursor
             }
             last = element;
             digested.push( element );
-            if ( this.currentIndex >= this.tokens.length || SQXRootParseCursor.shouldStop( this.tokens[this.currentIndex ], digested.length, conjunction, until ) ) {
+            if ( this.currentIndex >= this.tokens.length || SQXRootParseCursor.shouldStop( this.tokens[this.currentIndex], digested.length, conjunction, until ) ) {
                 break;
             }
             let next = this.tokens[this.currentIndex];
@@ -409,13 +411,18 @@ export class SQXParser
         this.state = new SQXQueryState( this.updateExpressionMap );
     }
 
-    protected resetState() {
-        this.state.reset();
-        this.tokens = [];
-        this.expressionMap = [];
-        this.anchorMap = {};
-        this.select = null;
-        this.where = null;
+    public static charClass( c ) {
+        let symbols = '<>=!@$%^&*{}+';
+        let alphanumPlus = 'abcdefghifjklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWUXYZ0123456789._:#-<>[]/';
+        let whitespace = " \r\n\t";
+        if ( symbols.indexOf( c ) >= 0 ) {
+            return 'symbol';
+        } else if ( alphanumPlus.indexOf( c ) >= 0 ) {
+            return 'alphanum';
+        } else if ( whitespace.indexOf( c ) >= 0 ) {
+            return 'whitespace';
+        }
+        return 'other';
     }
 
     public setHooks( hooks:SQXBehaviorHooks ) {
@@ -555,20 +562,6 @@ export class SQXParser
                 this.jsonKeyMap[opSpec.jsonKey] = opSpec;
             }
         }
-    }
-
-    public static charClass( c ) {
-        let symbols = '<>=!@$%^&*{}+';
-        let alphanumPlus = 'abcdefghifjklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWUXYZ0123456789._:#-<>[]/';
-        let whitespace = " \r\n\t";
-        if ( symbols.indexOf( c ) >= 0 ) {
-            return 'symbol';
-        } else if ( alphanumPlus.indexOf( c ) >= 0 ) {
-            return 'alphanum';
-        } else if ( whitespace.indexOf( c ) >= 0 ) {
-            return 'whitespace';
-        }
-        return 'other';
     }
 
     /**
@@ -756,7 +749,8 @@ export class SQXParser
      */
     public preprocess( tokenSequence:SQXToken[], parent:SQXToken ) {
         for ( let i = tokenSequence.length - 1; i > 0; i-- ) {
-            let c = tokenSequence[i], p = tokenSequence[i-1];
+            let c = tokenSequence[i];
+            let p = tokenSequence[i-1];
             let a = i > 1 ? tokenSequence[i-2]: { "textValue" : ''};
             const aTextValue = a.textValue.toUpperCase();
             const pTextValue = p.textValue.toUpperCase();
@@ -792,7 +786,7 @@ export class SQXParser
         } );
         if ( this.hooks && this.hooks.beforeParse ) {
             this.hooks.beforeParse( tokenSequence);
-        } 
+        }
     }
 
     public parse( tokenSequence:SQXToken[], depth:number = 0 ):SQXRootParseCursor {
@@ -844,13 +838,13 @@ export class SQXParser
     }
 
     public annotateExternalErrors() {
-        for ( var group in this.externalErrors ) {
+        for ( let group in this.externalErrors ) {
             if ( this.externalErrors.hasOwnProperty( group ) ) {
                 let errorGroup = this.externalErrors[group];
                 for ( let i = 0; i < errorGroup.length; i++ ) {
                     let descriptor = errorGroup[i];
                     this.withTokens( token => {
-                        for ( var property in descriptor.match ) {
+                        for ( let property in descriptor.match ) {
                             if ( ! token.hasOwnProperty( property ) ) {
                                 return;
                             } else if ( token[property] !== descriptor.match[property] ) {
@@ -896,7 +890,8 @@ export class SQXParser
 
     public toHtmlString( classifyCallback:{(token:string|SQXToken,depth:number):string[]}, startIndex:number = 0 ):string {
         let resultHtml = '';
-        let i = startIndex, depth = 0;
+        let i = startIndex;
+        let depth = 0;
         let expr = this.expression;
         let addSpan = ( classes:string[], title:string = null, startOffset:number, endOffset:number = 0 ) => {
             let titleAttr = title ? ` title="${title.replace(/"/g, "'")}"` : '';
@@ -918,7 +913,7 @@ export class SQXParser
                 let classes = classifyCallback( item, 0 ) || [];
                 classes.push( "sqx", "token" );
                 addSpan( classes, title, item.token_start, item.token_end );
-                i = item.token_end - 1; 
+                i = item.token_end - 1;
             } else if ( item === ">" ) {
                 depth++;
                 addSpan( classifyCallback( item, depth ) || [], null, i );
@@ -936,7 +931,7 @@ export class SQXParser
 
     public getOperatorByToken( operatorToken:string ):SQXOperatorMetadata {
         if ( this.tokenTypeDictionary.hasOwnProperty( operatorToken.toUpperCase() ) ) {
-            return this.tokenTypeDictionary[ operatorToken.toUpperCase() ];
+            return this.tokenTypeDictionary[operatorToken.toUpperCase()];
         }
         if ( this.jsonKeyMap.hasOwnProperty( operatorToken ) ) {
             return this.jsonKeyMap[operatorToken];
@@ -946,6 +941,15 @@ export class SQXParser
 
     public replace( tokens:SQXToken[], cursorOffset:number, tokenCount:number, replacements:string|string[] = "", verbose:boolean = false ):string {
         throw new Error("SQXParser.replace is deprecated.  Use SQXCursorDetails to perform replacements instead!" );
+    }
+
+    protected resetState() {
+        this.state.reset();
+        this.tokens = [];
+        this.expressionMap = [];
+        this.anchorMap = {};
+        this.select = null;
+        this.where = null;
     }
 }
 
