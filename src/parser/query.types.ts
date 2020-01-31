@@ -100,6 +100,15 @@ export class SQXSearchQuery
         item.limit             =   parsed.limit || null;
         item.having            =   parsed.having || null;
         item.time_range        =   parsed.time_range || null;
+        if ( item.where === null ) {
+            if ( parsed.hasOwnProperty("and") && parsed.and instanceof SQXOperatorAnd ) {
+                item.where = new SQXClauseWhere();
+                item.where.condition = parsed.and;
+            } else if ( parsed.hasOwnProperty("or") && parsed.or instanceof SQXOperatorOr ) {
+                item.where = new SQXClauseWhere();
+                item.where.condition = parsed.and;
+            }
+        }
 
         return item;
     }

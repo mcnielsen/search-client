@@ -466,6 +466,7 @@ export class SQXPropertyRef extends SQXToken
         } else if ( typeof( raw ) === 'string' ) {
             instance.property = raw;
         }
+        instance.textValue = instance.ns ? `${instance.ns}:${instance.property}` : instance.property;
         return instance;
     }
 
