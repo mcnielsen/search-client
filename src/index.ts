@@ -8,3 +8,4 @@ export {
   ReadLogMessageResponse } from './search-client';
 
 export * from './parser';
+
