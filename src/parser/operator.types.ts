@@ -191,6 +191,8 @@ export class SQXComparatorEqual extends SQXOperatorBase
     public fromJson( raw:any, converter:any ) {
         this.property = converter( raw[0] );
         this.value = SQXScalarValue.fromJson( raw[1] );
+        this.opPropertyRef = new SQXPropertyRef( this.property.textValue );
+        this.opValues = [ this.value ];
     }
 
     public fromParser( cursor:SQXParseCursor, tokenIndex:number ) {
@@ -531,6 +533,8 @@ export class SQXComparatorIn extends SQXOperatorBase
         for ( let i = 0; i < raw[1].length; i++ ) {
             this.values.push( SQXScalarValue.fromJson( raw[1][i] ) );
         }
+        this.opPropertyRef = new SQXPropertyRef( this.property.textValue );
+        this.opValues = [ ...this.values ];
     }
 
     public fromParser( cursor:SQXParseCursor, tokenIndex:number, peers:SQXToken[], parameters:SQXToken[] ) {
