@@ -1,11 +1,11 @@
 {
   "name": "@al/search",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "license": "MIT",
   "description": "A client for interacting with the Alert Logic Search Public API",
   "author": {
-    "name": "Barry Skidmore",
-    "email": "bskidmore@alertlogic.com"
+    "name": "ui team",
+    "email": "ui@alertlogic.com"
   },
   "keywords": [
     "Alert Logic",
@@ -14,8 +14,8 @@
   ],
   "maintainers": [
     {
-      "name": "Barry Skidmore",
-      "email": "bskidmore@alertlogic.com"
+      "name": "UI team",
+      "email": "ui@alertlogic.com"
     },
     {
       "name": "Alert Logic NPM Team",
