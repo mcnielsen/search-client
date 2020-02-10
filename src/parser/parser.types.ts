@@ -518,7 +518,7 @@ export class SQXParser
     }
 
     public fromJson( raw:any, ignoreErrors:boolean = false ):any {
-        let result = {};
+        let result:any = {};
         for ( let property in raw ) {
             if ( raw.hasOwnProperty( property ) ) {
                 if ( ! this.jsonKeyMap[property] ) {
