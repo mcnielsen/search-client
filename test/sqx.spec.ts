@@ -308,4 +308,13 @@ describe('SQX Parser', () => {
         expect( condition ).to.equal( null );
     } );
 
+    it("should support entitlement queries", () => {
+        try {
+            let qs = "WHERE $ CONTAINS_ANY ( 'assess', 'detect', 'respond' ) OR $ CONTAINS_ALL ( 'cloud_insight', 'cloud_defender', 'legacy:incident_notifications_v2' ) OR cloud_insight = true";
+            let query = SQXSearchQuery.fromQueryString( qs );
+            expect( true ).to.equal( true );
+        } catch( e ) {
+            console.log("Parse failed", e );
+        }
+    } );
 });

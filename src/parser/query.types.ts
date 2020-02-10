@@ -24,6 +24,13 @@ export interface SQXColumnDescriptor
     isAggregate?: boolean;      //  Is it an aggregate field
 }
 
+/**
+ * Describes an objects whose properties can be interrogated/tested using a query's conditions.
+ */
+export interface AlConditionalSubject {
+    getPropertyValue( property:string, ns:string ):any;
+}
+
 export class SQXSearchQuery
 {
     public key:               string                   = null;
@@ -38,8 +45,7 @@ export class SQXSearchQuery
     public time_range:        SQXClauseTimeRange       = null;
     public aggregate:         boolean                  = false;
 
-    constructor() {
-    }
+    protected jsonConditions:any = null;
 
     /**
      *  Builds a query instance from an SQL-like statement.
@@ -56,6 +62,14 @@ export class SQXSearchQuery
         }
 
         return SQXSearchQuery.fromParser( parser );
+    }
+
+    /**
+     *  Builds a query instance consisting of only a set of conditions, e.g., ( a = 1 && b = true ) OR c IN ( 5, 6, 7 ).
+     *  These conditions can be retrieved without their `WHERE` clause using the getConditions() method.
+     */
+    public static fromConditionString( expression:string ):SQXSearchQuery {
+        return SQXSearchQuery.fromQueryString( `WHERE ${expression}` );
     }
 
     /**
@@ -106,7 +120,7 @@ export class SQXSearchQuery
                 item.where.condition = parsed.and;
             } else if ( parsed.hasOwnProperty("or") && parsed.or instanceof SQXOperatorOr ) {
                 item.where = new SQXClauseWhere();
-                item.where.condition = parsed.and;
+                item.where.condition = parsed.or;
             }
         }
 
@@ -177,6 +191,8 @@ export class SQXSearchQuery
     public getConditions():SQXOperatorBase {
         if ( ! this.where ) {
             this.where = new SQXClauseWhere();
+        }
+        if ( ! this.where.condition ) {
             this.where.condition = new SQXOperatorAnd();
         }
         return this.where.condition;
@@ -327,6 +343,149 @@ export class SQXSearchQuery
             descendants.map( d => this.traverseDescendants( callback, d, depth + 1 ) );
         } else {
             callback( from, depth );
+        }
+    }
+
+    public test( subject:AlConditionalSubject ):boolean {
+        if ( ! this.jsonConditions ) {
+            this.jsonConditions = this.getConditions().toJson();
+        }
+        return this.dispatchOperator( this.jsonConditions, subject );
+    }
+
+    /**
+     *  The following dispatch/evaluate methods are support methods used to actually test a search condition against a target object.
+     *  The evaluative functionality of SQXSearchQuery doesn't necessarily encompass the full range of operators supported by log search.
+     */
+
+    protected dispatchOperator( op:any, subject:AlConditionalSubject ):boolean {
+        const operatorKeys = Object.keys( op );
+        this.assert( op, operatorKeys.length === 1, "an operator descriptor should have a single key." );
+        const operatorKey = operatorKeys[0];
+        const operatorValue = op[operatorKey];
+        switch( operatorKey ) {
+            case "and" :
+                return this.evaluateAnd( operatorValue, subject );
+            case "or" :
+                return this.evaluateOr( operatorValue, subject );
+            case "=" :
+                return this.evaluateEquals( operatorValue, subject );
+            case "!=" :
+                return this.evaluateNotEquals( operatorValue, subject );
+            case "in":
+                return this.evaluateIn( operatorValue, subject );
+            case "not" :
+                return this.evaluateNot( operatorValue, subject );
+            case "contains_all" :
+                return this.evaluateContainsAll( operatorValue, subject );
+            case "contains_any" :
+                return this.evaluateContainsAny( operatorValue, subject );
+            default :
+                throw new Error(`Cannot evaluate unknown operator '${operatorKey}'` );
+        }
+    }
+
+    protected evaluateAnd( op:any, subject:AlConditionalSubject ):boolean {
+        this.assert( op, op.hasOwnProperty("length") && op.length > 0, "`and` descriptor should consist of an array of non-zero length" );
+        let result = true;
+        for ( let i = 0; i < op.length; i++ ) {
+            result = result && this.dispatchOperator( op[i], subject );
+        }
+        return result;
+    }
+
+    protected evaluateOr( op:any, subject:AlConditionalSubject ):boolean {
+        this.assert( op, op.hasOwnProperty("length") && op.length > 0, "`and` descriptor should consist of an array of non-zero length" );
+        let result = false;
+        for ( let i = 0; i < op.length; i++ ) {
+            result = result || this.dispatchOperator( op[i], subject );
+        }
+        return result;
+    }
+
+    protected evaluateEquals( op:any, subject:AlConditionalSubject ):boolean {
+        this.assert( op, op.hasOwnProperty("length") && op.length === 2, "`!=` descriptor should have two elements" );
+        let property = this.normalizeProperty( op[0] );
+        let actualValue = subject.getPropertyValue( property.id, property.ns );
+        let testValue = op[1];
+
+        return actualValue === testValue;
+    }
+
+    protected evaluateNotEquals( op:any, subject:AlConditionalSubject ):boolean {
+        this.assert( op, op.hasOwnProperty("length") && op.length === 2, "`=` descriptor should have two elements" );
+        let property = this.normalizeProperty( op[0] );
+        let actualValue = subject.getPropertyValue( property.id, property.ns );
+        let testValue = op[1];
+
+        return actualValue !== testValue;
+    }
+
+    protected evaluateIn( op:any, subject:AlConditionalSubject ):boolean {
+        this.assert( op, op.hasOwnProperty("length") && op.length === 2, "`in` descriptor should have two elements" );
+        let property = this.normalizeProperty( op[0] );
+        let actualValue = subject.getPropertyValue( property.id, property.ns );
+        let testValues = op[1];
+        this.assert( testValues, testValues.hasOwnProperty("length"), "`in` values clause must be an array" );
+        return testValues.includes( actualValue );
+    }
+
+    protected evaluateNot( op:any, subject:AlConditionalSubject ):boolean {
+        return ! this.dispatchOperator( op, subject );
+    }
+
+    protected evaluateContainsAny( op:any, subject:AlConditionalSubject ):boolean {
+        this.assert( op, op.hasOwnProperty("length") && op.length === 2, "`in` descriptor should have two elements" );
+        let property = this.normalizeProperty( op[0] );
+        let actualValues = subject.getPropertyValue( property.id, property.ns );
+        this.assert( actualValues, typeof( actualValues ) === 'object', "`contains_any` operator must reference a property that is an object or an array" );
+        let testValues = op[1];
+        this.assert( testValues, testValues.hasOwnProperty("length"), "`in` values clause must be an array" );
+        return testValues.reduce( ( alpha:boolean, value:any ) => {
+            if ( actualValues instanceof Array ) {
+                return alpha || actualValues.includes( value );
+            } else {
+                return alpha || ( actualValues.hasOwnProperty( value ) && !! actualValues[value] );
+            }
+        }, false );
+    }
+
+    protected evaluateContainsAll( op:any, subject:AlConditionalSubject ):boolean {
+        this.assert( op, op.hasOwnProperty("length") && op.length === 2, "`in` descriptor should have two elements" );
+        let property = this.normalizeProperty( op[0] );
+        let actualValues = subject.getPropertyValue( property.id, property.ns );
+        this.assert( actualValues, typeof( actualValues ) === 'object', "`contains_all` operator must reference a property that is an object or an array" );
+        let testValues = op[1];
+        this.assert( testValues, testValues.hasOwnProperty("length"), "`in` values clause must be an array" );
+        return testValues.reduce( ( alpha:boolean, value:any ) => {
+            if ( actualValues instanceof Array ) {
+                return alpha && actualValues.includes( value );
+            } else {
+                return alpha && ( actualValues.hasOwnProperty( value ) && !! actualValues[value] );
+            }
+        }, true );
+    }
+
+    protected normalizeProperty( descriptor:any ):{ns:string,id:string} {
+        this.assert( descriptor, descriptor.hasOwnProperty("source"), "property reference must include a `source` property" );
+        let propertyRef = descriptor.source;
+        let propertyName;
+        let propertyNs = "default";
+        if ( typeof( propertyRef ) === 'object' && propertyRef.hasOwnProperty("ns") && propertyRef.hasOwnProperty("id") ) {
+            propertyNs = propertyRef.ns;
+            propertyName = propertyRef.id;
+        } else if ( typeof( propertyRef ) === 'string' ) {
+            propertyName = propertyRef;
+        } else {
+            throw new Error(`Invalid property reference [${JSON.stringify(descriptor[0].source)}] in condition descriptor` );
+        }
+        return { ns: propertyNs, id: propertyName };
+    }
+
+    protected assert( subject:any, value:boolean, message:string ) {
+        if ( ! value ) {
+            console.warn("Invalid conditional element", subject );
+            throw new Error( `Failed to interpret condition descriptor: ${message}` );
         }
     }
 }
