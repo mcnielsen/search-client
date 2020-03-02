@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe, before } from 'mocha';
-import { SQXSearchQuery, SQXParser, SQXQueryState, SQXCursorDetails, SQXOperatorAnd, SQXOperatorBase } from '../src/parser';
+import { SQXSearchQuery, SQXQueryBuilder, SQXParser, SQXQueryState, SQXCursorDetails, SQXOperatorAnd, SQXOperatorBase } from '../src/parser';
 
 describe('SQX Parser', () => {
     describe( 'query parsing', () => {
@@ -316,5 +316,64 @@ describe('SQX Parser', () => {
         } catch( e ) {
             console.log("Parse failed", e );
         }
+    } );
+
+    it("should support dynamic query building", () => {
+        let where = new SQXQueryBuilder().where();
+        where.not().equals( "kevin", "1" );
+        where.equals( "account.id", "67108880" );
+        where.not().in( "account.id", [ "1", "2", "3", "4" ] );
+        where.notEquals( "activated", true );
+
+        const query = where.toJson();
+        expect( query ).to.deep.equal( {
+            and: [
+                     {
+                        "not": {
+                            "=": [
+                                {
+                                    "source": "kevin"
+                                },
+                                "1"
+                            ]
+                        }
+                    },
+                    {
+                        "=": [
+                            {
+                                "source": "account.id"
+                            },
+                            "67108880"
+                        ]
+                    },
+                    {
+                        "not": {
+                            "in": [
+                                {
+                                    "source": "account.id"
+                                },
+                                [
+                                    "1",
+                                    "2",
+                                    "3",
+                                    "4"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "!=": [
+                            {
+                                "source": "activated"
+                            },
+                            true
+                        ]
+                    }
+
+            ]
+        } );
+
+        const queryExpression = where.toQueryString();
+        expect( queryExpression ).to.equal( 'WHERE NOT kevin = "1" AND account.id = "67108880" AND NOT account.id IN ( "1", "2", "3", "4" ) AND activated != true' );
     } );
 });

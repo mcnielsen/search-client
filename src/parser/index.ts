@@ -4,3 +4,4 @@ export * from './clause.types';
 export * from './parser.types';
 export * from './cursor.types';
 export * from './query.types';
+export * from './query-builder.types';

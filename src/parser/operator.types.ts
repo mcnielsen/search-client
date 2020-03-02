@@ -233,8 +233,13 @@ export class SQXComparatorNotEqual extends SQXOperatorBase
     public property:SQXPropertyRef|SQXOperatorBase;
     public value:SQXScalarValue;
 
-    constructor() {
+    constructor( property?:string|SQXPropertyRef, value?:string|number|boolean|SQXScalarValue) {
         super();
+        if ( property && value ) {
+            this.property = this.opPropertyRef = new SQXPropertyRef( property );
+            this.value = new SQXScalarValue( value );
+            this.opValues = [ this.value ];
+        }
     }
 
     public fromJson( raw:any, converter:any ) {
