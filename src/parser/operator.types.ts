@@ -139,6 +139,7 @@ export class SQXOperatorNegate extends SQXOperatorBase
 
     public fromJson( raw:any, converter:any ) {
         this.condition = converter( raw );
+        this.condition.parent = this;
     }
 
     public fromParser( cursor:SQXParseCursor, tokenIndex:number ) {
@@ -165,6 +166,10 @@ export class SQXOperatorNegate extends SQXOperatorBase
         return {
             "not": this.condition.toJson()
         };
+    }
+
+    public getDescendants():SQXToken[] {
+        return this.condition ? [ this.condition ] : [];
     }
 }
 

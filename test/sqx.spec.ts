@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe, before } from 'mocha';
-import { SQXSearchQuery, SQXQueryBuilder, SQXParser, SQXQueryState, SQXCursorDetails, SQXOperatorAnd, SQXOperatorBase } from '../src/parser';
+import { SQXSearchQuery, SQXQueryBuilder, SQXParser, SQXQueryState, SQXCursorDetails, SQXOperatorAnd, SQXOperatorBase, SQXOperatorNegate, SQXComparatorEqual } from '../src/parser';
 
 describe('SQX Parser', () => {
     describe( 'query parsing', () => {
@@ -318,7 +318,7 @@ describe('SQX Parser', () => {
         }
     } );
 
-    it("should support dynamic query building", () => {
+    it("should support dynamic query building and lookup of conditions for specific properties", () => {
         let where = new SQXQueryBuilder().where();
         where.not().equals( "kevin", "1" );
         where.equals( "account.id", "67108880" );
@@ -373,7 +373,32 @@ describe('SQX Parser', () => {
             ]
         } );
 
-        const queryExpression = where.toQueryString();
-        expect( queryExpression ).to.equal( 'WHERE NOT kevin = "1" AND account.id = "67108880" AND NOT account.id IN ( "1", "2", "3", "4" ) AND activated != true' );
+        let q2 = SQXSearchQuery.fromJson( {
+            "and":[
+               {
+                  "in":[
+                     {
+                        "source":"notification.threat_level"
+                     },
+                     [
+                        "Info"
+                     ]
+                  ]
+               },
+               {
+                  "not":{
+                     "=":[
+                        {
+                           "source":"account.id"
+                        },
+                        "2"
+                     ]
+                  }
+               }
+            ]
+        } );
+        let condition = q2.getPropertyCondition( "account.id" );
+        expect( condition instanceof SQXComparatorEqual ).to.equal( true );
+        expect( condition.parent instanceof SQXOperatorNegate ).to.equal( true );
     } );
 });
