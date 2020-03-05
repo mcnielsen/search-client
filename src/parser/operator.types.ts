@@ -245,6 +245,8 @@ export class SQXComparatorNotEqual extends SQXOperatorBase
     public fromJson( raw:any, converter:any ) {
         this.property = converter( raw[0] );
         this.value = SQXScalarValue.fromJson( raw[1] );
+        this.opPropertyRef = new SQXPropertyRef( this.property.textValue );
+        this.opValues = [ this.value ];
     }
 
     public fromParser( cursor:SQXParseCursor, tokenIndex:number ) {
